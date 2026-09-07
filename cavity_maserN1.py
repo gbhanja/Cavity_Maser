@@ -33,16 +33,13 @@ gamma_c = 32.0 * kappa
 nc = 0.05
 n_max = 30                                          # Fock-space cutoff for numerical steady state
 
-nh_values = np.linspace(1e-3, 9.0, 60)              # sweep for Fig. 2 (gain/pop/<n>)
-nh_points = np.array([0.17, 0.507, 2.629, 9.0])     # special points for Fig. 3
+nh_values = np.linspace(1e-3, 9.0, 60)              # sweep for (gain/population/<n>)
+nh_points = np.array([0.17, 0.507, 2.629, 9.0])     # special points for (photon distributions + Wigner functions)
 
 xvec = np.linspace(-6, 6, 200)                      # Wigner function grid
 
 data_folder = "data"
 os.makedirs(data_folder, exist_ok=True)
-
-output_folder = "figures"
-os.makedirs(output_folder, exist_ok=True)
 
 
 def make_filename():
@@ -97,8 +94,8 @@ def liouvillian_ops(nh, nc, g, kappa, gamma_h, gamma_c, nmax):
     H = g * (Sigma.dag() * a + Sigma * a.dag())
 
     c_ops = [
-        np.sqrt(gamma_h * (nh + 1)) * Tau_h,      # e2 -> g   (spontaneous + stimulated emission)
-        np.sqrt(gamma_h * nh) * Tau_h.dag(),      # g  -> e2  (thermal absorption)
+        np.sqrt(gamma_h * (nh + 1)) * Tau_h,      # e2 -> g   (emission)
+        np.sqrt(gamma_h * nh) * Tau_h.dag(),      # g  -> e2  (absorption)
         np.sqrt(gamma_c * (nc + 1)) * Tau_c,      # e1 -> g
         np.sqrt(gamma_c * nc) * Tau_c.dag(),      # g  -> e1
         np.sqrt(kappa) * a,                       # cavity decay
@@ -116,6 +113,7 @@ def steady_state_solver(nh, nc, g, kappa, gamma_h, gamma_c, nmax, method='direct
 
 
 def observables(rho_ss, a):
+
     n_avg = qt.expect(a.dag() * a, rho_ss)
 
     n2 = qt.expect(a.dag() * a.dag() * a * a, rho_ss)
@@ -138,23 +136,23 @@ def atomic_populations(rho_ss):
     return Ng, N1, N2
 
 
-# ======================================================================
-# 3. ANALYTICAL RESULTS (Li et al., Sec. II-IV)
-# ======================================================================
+# =============================================================
+# ANALYTICAL QUANTITIES FROM THE SEMICLASSICAL RATE EQUATIONS : 
+# =============================================================
 
 def analytic_quantities(nh, nc, g, kappa, gamma_h, gamma_c):
 
-    Gamma = gamma_h * (nh + 1) + gamma_c * (nc + 1)                  # Eq. (4)
-    Phi = 3 * nh * nc + 2 * (nh + nc) + 1                            # Eq. (5)
+    Gamma = gamma_h * (nh + 1) + gamma_c * (nc + 1)                  
+    Phi = 3 * nh * nc + 2 * (nh + nc) + 1                            
     Psi = (1.0 / (gamma_h * gamma_c)) * (gamma_h * (3*nh + 1) + gamma_c * (3*nc + 1))
 
-    dN0 = (nh - nc) / Phi                                            # Eq. (7)
-    G = 4 * g**2 * dN0 / Gamma                                       # Eq. (8)
+    dN0 = (nh - nc) / Phi                                            
+    G = 4 * g**2 * dN0 / Gamma                                      
     B_semi = 4 * g**2 * Psi / (Gamma * Phi)
 
-    A = 4 * g**2 * nh * (nc + 1) / (Gamma * Phi)                     # Eq. (11)
-    Ab = 4 * g**2 * nc * (nh + 1) / (Gamma * Phi)                    # Eq. (11)
-    B = A * 4 * g**2 * Psi / (Gamma * Phi)                           # Eq. (11)
+    A = 4 * g**2 * nh * (nc + 1) / (Gamma * Phi)                      
+    Ab = 4 * g**2 * nc * (nh + 1) / (Gamma * Phi)                    
+    B = A * 4 * g**2 * Psi / (Gamma * Phi)                           
 
     return dict(Gamma=Gamma, Phi=Phi, Psi=Psi, dN0=dN0, G=G,
                 B_semiclassical=B_semi, A=A, Ab=Ab, B=B)
@@ -219,8 +217,7 @@ def find_thresholds(nh_grid, nc, g, kappa, gamma_h, gamma_c):
 
 def test_ssdb_population_ratio(nc, gamma_h, gamma_c, nmax, nh_test=3.0, tol=2e-3):
     """
-    At g = 0 (no cavity coupling), the atomic populations must return to
-    the bare SSDB ratio.
+    At g = 0 (no cavity coupling), the atomic populations must return to the bare SSDB ratio.
     """
 
     rho_ss, _ = steady_state_solver(nh_test, nc, g=0.0, kappa=kappa,
@@ -239,7 +236,7 @@ def test_ssdb_population_ratio(nc, gamma_h, gamma_c, nmax, nh_test=3.0, tol=2e-3
     if not (ok1 and ok2):
         raise AssertionError(
             "Basis labeling / bath-operator assignment is inconsistent with "
-            "the SSDB population ordering (Eq. 6). Check which tau operator "
+            "the SSDB population ordering. Check which tau operator "
             "is wired to which bath in build_liouvillian_ops()."
         )
     return True
@@ -340,11 +337,14 @@ def run_all_sanity_checks():
 # ==================
 
 def compute_scan_point(nh, nc, g, kappa, gamma_h, gamma_c, nmax):
-    """Worker for the Fig. 2-style sweep over n_h."""
+
+    """Worker for the (gain/population/<n>) sweep over n_h."""
+
     # analytical
     p = analytic_quantities(nh, nc, g, kappa, gamma_h, gamma_c)
     G_ov_k = p['G'] / kappa
-    n_an, var_an, P0 = analytic_navg_and_var(nh, nc, g, kappa, gamma_h, gamma_c, nmax)
+    n_an, var_an, _ = analytic_navg_and_var(nh, nc, g, kappa, gamma_h, gamma_c, nmax)
+
 
     # numerical (full quantum steady state)
     rho_ss, a = steady_state_solver(nh, nc, g, kappa, gamma_h, gamma_c, nmax)
@@ -355,11 +355,14 @@ def compute_scan_point(nh, nc, g, kappa, gamma_h, gamma_c, nmax):
 
 
 def compute_fig3_point(nh, nc, g, kappa, gamma_h, gamma_c, nmax, xvec):
+
     """Worker for photon distributions + Wigner functions at fixed n_h values."""
+
     rho_ss, a = steady_state_solver(nh, nc, g, kappa, gamma_h, gamma_c, nmax)
+
     n_num, g2_num, Pn_num, rho_cav = observables(rho_ss, a)
 
-    Pn_an, p = analytic_Pn(nh, nc, g, kappa, gamma_h, gamma_c, nmax)
+    Pn_an, _ = analytic_Pn(nh, nc, g, kappa, gamma_h, gamma_c, nmax)
 
     W = qt.wigner(rho_cav, xvec, xvec)
 
@@ -402,10 +405,11 @@ if __name__ == "__main__":
     else:
         print("Running simulation...")
 
-        # ---- (A) scalar sweep over n_h for Fig. 2 ----
+        # ---- (A) scalar sweep over n_h ----
+
         results_scan = Parallel(n_jobs=-1)(
             delayed(compute_scan_point)(nh, nc, g, kappa, gamma_h, gamma_c, n_max)
-            for nh in tqdm(nh_values, desc="Scan over n_h (Fig. 2)")
+            for nh in tqdm(nh_values, desc="Scan over n_h")
         )
 
         (nh_out, G_out, Ng_out, N1_out, N2_out,
@@ -421,10 +425,11 @@ if __name__ == "__main__":
         g2_numeric    = np.array(g2_out)
         var_analytic  = np.array(var_out)
 
-        # ---- (B) distributions + Wigner functions for Fig. 3 ----
+        # ---- (B) distributions + Wigner functions ----
+
         results_fig3 = Parallel(n_jobs=-1)(
             delayed(compute_fig3_point)(nh, nc, g, kappa, gamma_h, gamma_c, n_max, xvec)
-            for nh in tqdm(nh_points, desc="Fig. 3 points (Pn, Wigner)")
+            for nh in tqdm(nh_points, desc="(Pn, Wigner)")
         )
 
         (nh3_out, Pn_num_list, Pn_an_list, nnum3_out, g23_out, W_list) = zip(*results_fig3)
@@ -436,12 +441,12 @@ if __name__ == "__main__":
         g2_fig3     = np.array(g23_out)
         Wigner_arr  = np.array(W_list)
 
-        # ---- thresholds (fast analytical root-finding) ----
+        # ---- thresholds (analytical root-finding) ----
         thresholds = np.array(find_thresholds(
             np.linspace(1e-4, 15, 4000), nc, g, kappa, gamma_h, gamma_c))
         print("Lasing threshold(s) at n_h =", thresholds)
 
-        # ---- post-hoc sanity check on the sweep results themselves ----
+        # ---- post-hoc sanity check on the sweep results ----
         print("\nPost-sweep check: numeric vs analytic <n> agreement across full sweep:")
         rel_errs = np.abs(navg_numeric - navg_analytic) / np.maximum(navg_analytic, 1e-8)
         print(f"  max relative error = {rel_errs.max():.2%}, "
@@ -450,6 +455,7 @@ if __name__ == "__main__":
             print("  WARNING: large discrepancy somewhere in the sweep -- "
                   "check n_max convergence at that n_h.")
 
+            
         np.savez_compressed(
             filename,
             nh_values=nh_values,
