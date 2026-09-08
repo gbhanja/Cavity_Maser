@@ -48,7 +48,7 @@ def make_filename():
             f"gh{gamma_h}_gc{gamma_c}_nc{nc}_nmax{n_max}.npz")
 
 
-filename = os.path.join(data_folder, "cavity_maser_N1.npz")
+filename = os.path.join(data_folder, "cavity_maser.npz")
 print("Data file:", filename)
 
 
