@@ -47,20 +47,6 @@ n_max   = 50
 
 nh_values = np.linspace(1e-3, 9.0, 60)
 
-
-# ------------------------------------------------------------
-# Power units
-# ------------------------------------------------------------
-#
-# If physical power is required, specify omega_l [rad/s].
-#
-# Otherwise leave:
-#
-#     hbar_omega_l = 1
-#
-# and power is reported in units of hbar*omega_l.
-#
-
 hbar_omega_l = 1.0
 
 
